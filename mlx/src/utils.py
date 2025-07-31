@@ -1,6 +1,6 @@
 from src.__init__ import logger
 
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 from src.config import Config
 import csv
@@ -17,9 +17,7 @@ import pandas as pd
 
 import random 
 
-import time
-from tqdm import tqdm 
-from typing import List, Tuple
+from typing import List
 
 def load_data(data_path:str):
     """Load training and test data"""
@@ -232,7 +230,10 @@ def text_to_grid(text: str) -> List[List[int]]:
                 if numbers:
                     grid.append(numbers)
 
+        grid = fill_irregular_grid(grid)
+        
         return grid if grid else [[0]]
+        
     except Exception as e:
         print(f"Error parsing grid: {e}")
         return [[0]]
@@ -311,12 +312,20 @@ def infer_out_shape(
             rows = expected_rows
         return (rows, cols)
 
+    for (train_in_shape, train_out_shape) in zip(input_shapes, output_shapes):
+        if test_shape == train_in_shape:
+            if verbose:
+                logger.info("Test input shape matches a training input shape exactly")  
+            rows = expected_rows if expected_rows else train_out_shape[0]
+            return (rows, train_out_shape[1])   
+        
     if verbose:
-        logger.info("Fallback 1: Looking for constant scaling between input and output")
+        logger.info("Looking for constant scaling between input and output")
     scales = []
     for (in_r, in_c), (out_r, out_c) in zip(input_shapes, output_shapes):
         if in_r != 0 and in_c != 0:
             scales.append((out_r / in_r, out_c / in_c))
+    
     if scales and all(s == scales[0] for s in scales):
         scale_r, scale_c = scales[0]
         return (
@@ -325,16 +334,10 @@ def infer_out_shape(
         )
     else:
         if verbose:
-            logger.info("Inconsistency detected...exploring other options.")
-    for (train_in_shape, train_out_shape) in zip(input_shapes, output_shapes):
-        if test_shape == train_in_shape:
-            if verbose:
-                logger.info("Fallback 2: Test input shape matches a training input shape exactly")  
-            rows = expected_rows if expected_rows else train_out_shape[0]
-            return (rows, train_out_shape[1])    
+            logger.info("Inconsistency detected...exploring other options.") 
     
     if verbose:
-        logger.info("Fallback 3: use test input shape with expected_rows override")    
+        logger.info("Use test input shape with expected_rows override")    
     rows = expected_rows if expected_rows else test_shape[0]
     
     return (rows, test_shape[1])
@@ -376,3 +379,38 @@ def generate_submission(
         writer.writerows(submission_rows)
 
     print(f"✅ Submission saved to {output_path}")
+
+
+def fill_irregular_grid(grid, use_mode_if_none=True):
+    """
+    Makes a non-rectangular grid rectangular by padding short rows.
+    If the grid is already regular, it is returned unchanged.
+
+    Args:
+        grid (List[List[int]]): 2D list with possibly unequal row lengths.
+        use_mode_if_none (bool): If True and fill_value is None, use mode of grid.
+
+    Returns:
+        List[List[int]]: Rectangular grid.
+    """
+    if not grid:
+        return []
+
+    row_lengths = [len(row) for row in grid]
+    if len(set(row_lengths)) == 1:
+        return grid  # already rectangular
+
+    max_cols = max(row_lengths)
+
+    if use_mode_if_none:
+        flat = [v for row in grid for v in row]
+        fill_value = Counter(flat).most_common(1)[0][0] if flat else Config.DEFAULT_BG_VALUE
+
+    filled = []
+    for row in grid:
+        row = row[:max_cols]  # crop excess
+        if len(row) < max_cols:
+            row += [fill_value] * (max_cols - len(row))  # pad short rows
+        filled.append(row)
+
+    return filled

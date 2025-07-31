@@ -1,16 +1,23 @@
+from dotenv import load_dotenv
+
 from   matplotlib import colors
 
+import os
 import os.path as osp
+
 import torch
 
+load_dotenv()
+    
 class Config:
     # I/O
     root            = "../" 
     data_path       = osp.join(root, "data")
     submission_path = osp.join(root, "submissions")
     model_zoo       = osp.join(root, "models")
-    experiment      = "baseline-cp"
-    
+    experiment      = "llm-fs"
+    HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
+
     # 0:black, 1:blue, 2:red, 3:green, 4:yellow, # 5:gray, 6:magenta, 7:orange, 8:sky, 9:brown
     CMAP            = colors.ListedColormap(
         ['#000000', '#0074D9', '#FF4136', '#2ECC40', '#FFDC00',
@@ -20,11 +27,21 @@ class Config:
     DEFAULT_BG_VALUE = 7  # (orange not black...from EDA)
 
     # model vars
-    base_llm        = "nvidia/Mistral-NeMo-Minitron-8B-Base"
-    model_name      = "simple-arc-solver-cp"
-    device          = 'mps'
-    dtype           = torch.float16
-    max_tokens      = 512
-    max_candidates  = 3
+    base_llm            = "Qwen/Qwen2.5-14B-Instruct"
+    model_name          = "arc-solver-"+base_llm.split("/")[-1]
+    device              = 'cuda'
+    target_platform     = "cuda"
+    dtype               = torch.bfloat16
+    max_tokens          = 4096
+    temperature         = 0.11
+    top_p               = 0.9
+    repetition_penalty  = 1.1
+    do_sample           = True
+    trust_remote_code   = True
+    MAX_N_ROWS          = 25
+
+
+    
+
 
     
