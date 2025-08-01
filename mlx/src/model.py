@@ -105,7 +105,7 @@ class ARCModel:
                 quantization_config=quantization_config if quantize_model else None
             ).to(Config.device)
 
-        logger.info(f"✅ Successfully loaded base LLM ({self.base_llm_name}).")
+        logger.info(f"Successfully loaded base LLM ({self.base_llm_name}).")
 
     def prepare_model_inputs(
             self,
@@ -198,39 +198,52 @@ class ARCModel:
 
         return response
 
-    def solve(self, task, expected_rows:int=None):
+    def solve(
+            self, 
+            task, 
+            expected_rows:int=None,
+            verbose:bool=False
+        ):
         train = task["train"]
-        test = task["test"]
-        results = []
+        test = task["test"][0]
 
-        for test_input in test:
-            if "output" in test_input.keys():
-                # adjust expected row num
-                expected_rows = len(test_input["output"])
+        if "output" in test.keys():
+            # adjust expected row num
+            expected_rows = len(test["output"])
 
-            inferred_out_shape = infer_out_shape(
-                train_pairs=train, 
-                test_input=test_input["input"],  
-                expected_rows=expected_rows,
-                verbose=self.verbose
+        inferred_out_shape = infer_out_shape(
+            train_pairs=train, 
+            test_input=test["input"],  
+            expected_rows=expected_rows,
+            verbose=verbose
+        )
+
+        if self.base_llm_name is not None:
+            if verbose:
+                logger.info("Solving with LLM...")
+            try:
+                out_grid = self.solve_with_llm(
+                    task=task, 
+                    expected_shape=inferred_out_shape,
+                    verbose=verbose
+                )
+            except Exception as e:
+                logger.error(f"Failed LLM execution: {e}")
+        else:
+            out_grid = self.copy_input_solver(
+                test["input"], 
+                inferred_out_shape,
+                verbose=verbose
             )
-
-            if self.base_llm_name is not None:
-                if self.verbose:
-                    logger.info("Solving with LLM...")
-                try:
-                    candidates = self.solve_with_llm(train, test_input["input"], inferred_out_shape[0])
-                    results.append(candidates[0])
-                except Exception as e:
-                    logger.error(f"Failed llm execution: {e}")
-            else:
-                if self.verbose:
-                    logger.info("Fallback solver...")
-                results.append(self.copy_input_solver(test["input"], inferred_out_shape))
                 
-        return results[0] # this will ensure we only return one prediction
+        return out_grid
 
-    def copy_input_solver(self, test_input, expected_shape=None):
+    def copy_input_solver(
+            self, 
+            test_input, 
+            expected_shape=None,
+            verbose:bool=False
+            ):
         """
         Returns the input grid as the output grid, optionally adjusting to expected shape.
         
@@ -241,21 +254,29 @@ class ARCModel:
         Returns:
             List[List[int]]: Output grid.
         """
-        if self.verbose:
-            logger.info("Copy input solver...")  
+        if verbose:
+            logger.info("Fallback - Copy input solver...")  
 
         output = [row[:] for row in test_input]
 
         if expected_shape:
-            output = self.adjust_rows_and_columns(grid=output, expected_shape=expected_shape)
-            # output = self.adjust_columns_only(grid=output, expected_cols=expected_shape[1])
+            output = self.adjust_rows_and_columns(
+                grid=output, 
+                expected_shape=expected_shape,
+                verbose=verbose
+            )
             
-        if self.verbose:
+        if verbose:
             logger.info("Done!")  
 
         return output
 
-    def solve_with_llm(self, task, expected_shape, verbose:bool=False):
+    def solve_with_llm(
+            self, 
+            task, 
+            expected_shape, 
+            verbose:bool=False
+        ):
 
         if verbose:
             logger.info(f"Expected shape: {expected_shape}")
@@ -271,26 +292,44 @@ class ARCModel:
         if expected_shape[0] > Config.MAX_N_ROWS:
             out_grid = self.copy_input_solver(task["test"][0]["input"], expected_shape)
         else:
-            response = self.get_response(inputs, verbose=verbose, expected_rows=expected_shape[0])
-            extracted_grids = re.findall(r"\[\s*\[.*?\]\s*\]", response, re.DOTALL)
+            response = self.get_response(
+                inputs, 
+                verbose=verbose, 
+                expected_rows=expected_shape[0]
+            )
+            out_grid = self.extract_out_grid(response)
             
-            if len(extracted_grids)==0:
+            if len(out_grid)==0:
                 out_grid = task["test"][0]["input"]
-            else:
-                out_grid =             extracted_grids[-1]
 
-
-            out_grid = text_to_grid(out_grid)
+            out_grid_shape = get_grid_shape(out_grid)
             
         elapsed = time.time() - start_time
-        if self.verbose:
+        if verbose:
             logger.info(f"Completion time: {elapsed:.4f} seconds")
         
-        if expected_shape:
-            output = self.adjust_rows_and_columns(grid=out_grid, expected_shape=expected_shape)
+        if expected_shape and out_grid_shape!=expected_shape:
+            out_grid = self.adjust_rows_and_columns(
+                grid=out_grid, 
+                expected_shape=expected_shape
+            )
             
-        return output, elapsed
+        return out_grid
 
+    def extract_out_grid(self, response):
+        # Find all list-of-lists patterns (non-greedy, multiline)
+        matches = re.findall(r"\[\s*\[.*?\]\s*\]", response, re.DOTALL)
+        output_grid = []
+        
+        if matches:
+            try:
+                output_grid = ast.literal_eval(matches[-1])
+            except Exception as e:
+                logger.error(e)
+                raise e
+            
+        return output_grid
+    
     def pixel_accuracy(self, pred, target):
         try:
             pred_arr = np.array(pred)
@@ -335,7 +374,8 @@ class ARCModel:
             self, 
             grid, 
             expected_shape, 
-            fill_value=Config.DEFAULT_BG_VALUE
+            fill_value=Config.DEFAULT_BG_VALUE,
+            verbose:bool=False
         ):
         """
         Adjusts a grid to the expected (rows, cols) shape by cropping or padding.
@@ -348,7 +388,7 @@ class ARCModel:
         Returns:
             List[List[int]]: Resized grid.
         """
-        if self.verbose:
+        if verbose:
             logger.info("Adjusting grid...")  
             logger.info(f"{expected_shape=}")
 
@@ -364,7 +404,7 @@ class ARCModel:
                 row = [fill_value] * exp_cols # pad grid
             adjusted.append(row)
        
-        if self.verbose:
+        if verbose:
             final_shape = get_grid_shape(adjusted)
             logger.info(f"{final_shape=}")
         

@@ -106,17 +106,21 @@ Phi-4-mini-reasoning-8bit
 
 Qwen/Qwen2.5-14B-Instruct
 - ~15GB on MBP (8-bit); ~29GB on RTX 6000
-- Very fast and consistent with the solving the puzzles
-- Pub. LB: 28.846% with baseline setup
+- Very fast (CUDA) and consistent with the solving the puzzles
+- cannot solve larger inputs (crashes for grid size >20x20)
+- Pub. LB: 28.846% with baseline setup (pre-sealing)
+    - While preparing my code for review, I noticed a mistake in the grid extraction logic `src/model.py - extract_out_grid` that seems to have affected the model's prediction workflow by replacing most of the predicted values with the `DEFAULT_BG_VALUE`.
 
 
 ## TODO
 - Try Qwen2.5 with better prompting and an addtion of tool use (specific functions for grid inference)
-- clean up code base to remove competition-specific conditioning
-- Explore multimodal computer vision approaches 
+    - Also after bug fixes
+- Clean up code base to remove competition-specific conditioning after reviews
+    - to facilitate exploration of the official challenge
+- Explore multimodal LLM and computer vision approaches 
 
 ## Acknowledgement
-This codebase was developed with the collaboration of GPT-4o:
+This codebase was developed with the collaboration of GPT-4o for:
 - Brainstorming
 - Code completion
 - Code Refactoring

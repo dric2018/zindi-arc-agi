@@ -9,7 +9,7 @@ class Config:
     data_path       = osp.join(root, "data")
     submission_path = osp.join(root, "submissions")
     model_zoo       = osp.join(root, "models")
-    experiment      = "llm-fs"
+    experiment      = "simple-arc-solver" #"llm-fs"
     
     # 0:black, 1:blue, 2:red, 3:green, 4:yellow, # 5:gray, 6:magenta, 7:orange, 8:sky, 9:brown
     CMAP            = colors.ListedColormap(
@@ -20,8 +20,8 @@ class Config:
     DEFAULT_BG_VALUE = 7  # (orange not black...from EDA)
 
     # model vars
-    base_llm            = "mlx-community/Qwen2.5-14B-Instruct-8bit" #"mlx-community/Mistral-Nemo-Instruct-2407-bit" "mlx-community/nvidia_Llama-3.1-Nemotron-70B-Instruct-HF_4bit"
-    model_name          = "arc-solver-"+base_llm.split("/")[-1]
+    base_llm            = "mlx-community/Qwen2.5-14B-Instruct-8bit"
+    model_name          = "baseline-cp" #base_llm.split("/")[-1]
     device              = 'mps'
     target_platform     = "mlx"
     dtype               = torch.float16
@@ -31,7 +31,7 @@ class Config:
     repetition_penalty  = 1.4
     do_sample           = True
     trust_remote_code   = True
-    MAX_N_ROWS          = 25
+    MAX_N_ROWS          = 30
 
 
     
