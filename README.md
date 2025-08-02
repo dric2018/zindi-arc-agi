@@ -12,7 +12,7 @@ Goal: to be ranked among the top 10 participants at the end of the competition.
  Reproducing the competiton score can be done by using the fallback solver through the [zindi-arc-solver.ipynb](/zindi-arc-solver.ipynb) notebook from top to bottom. The below description is also sumarized in the `solution.pdf` document. The solution was only tested on Unix-based host machines.
 
  Note: If running the submission notebook on Google colab, unsure to use the following steps:
- - upload the [zindi-arc-solver-colab.ipynb](/zindi-arc-solver-colab.ipynb) to colab; no GPU is required
+ - upload the `zindi-arc-solver-colab.ipynb` to colab; no GPU is required
  - After running the cell containing the command `!mkdir submissions src data`, upload the data and src files to their respected folder
     - data
         - train.json

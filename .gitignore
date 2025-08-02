@@ -1,6 +1,7 @@
 data/
 old_data/
 submissions/
+/submission/
 writeup/
 /cuda/
 /mlx/
