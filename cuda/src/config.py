@@ -1,13 +1,8 @@
-from dotenv import load_dotenv
-
 from   matplotlib import colors
 
-import os
 import os.path as osp
 
 import torch
-
-load_dotenv()
     
 class Config:
     # I/O
@@ -16,7 +11,6 @@ class Config:
     submission_path = osp.join(root, "submissions")
     model_zoo       = osp.join(root, "models")
     experiment      = "llm-fs"
-    HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
     # 0:black, 1:blue, 2:red, 3:green, 4:yellow, # 5:gray, 6:magenta, 7:orange, 8:sky, 9:brown
     CMAP            = colors.ListedColormap(
@@ -33,12 +27,13 @@ class Config:
     target_platform     = "cuda"
     dtype               = torch.bfloat16
     max_tokens          = 4096
-    temperature         = 0.11
+    temperature         = 0.1
     top_p               = 0.9
     repetition_penalty  = 1.1
     do_sample           = True
     trust_remote_code   = True
-    MAX_N_ROWS          = 25
+    quantize_model      = True
+    MAX_N               = 30
 
 
     

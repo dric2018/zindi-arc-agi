@@ -9,7 +9,7 @@ class Config:
     data_path       = osp.join(root, "data")
     submission_path = osp.join(root, "submissions")
     model_zoo       = osp.join(root, "models")
-    experiment      = "simple-arc-solver" #"llm-fs"
+    experiment      = "arc-solver" #"llm-fs"
     
     # 0:black, 1:blue, 2:red, 3:green, 4:yellow, # 5:gray, 6:magenta, 7:orange, 8:sky, 9:brown
     CMAP            = colors.ListedColormap(
@@ -21,17 +21,17 @@ class Config:
 
     # model vars
     base_llm            = "mlx-community/Qwen2.5-14B-Instruct-8bit"
-    model_name          = "baseline-cp" #base_llm.split("/")[-1]
+    model_name          = base_llm.split("/")[-1] #"baseline-cp" 
     device              = 'mps'
     target_platform     = "mlx"
     dtype               = torch.float16
     max_tokens          = 4096
     temperature         = 0.1
     top_p               = 0.95
-    repetition_penalty  = 1.4
+    repetition_penalty  = 1.2
     do_sample           = True
     trust_remote_code   = True
-    MAX_N_ROWS          = 30
+    MAX_N               = 30
 
 
     

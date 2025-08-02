@@ -7,30 +7,15 @@ from mlx_lm import load, generate
 
 import numpy as np
 
-from pprint import pprint
 import re
 
 import time
 import torch
-import torch.nn as nn
 
-from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig, BitsAndBytesConfig, PreTrainedTokenizer, StoppingCriteria
+from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig, BitsAndBytesConfig
 from typing import Tuple
 
-from src.utils import infer_out_shape, get_grid_shape, text_to_grid, grid_to_text
-
-
-class RowLimitStoppingCriteria(StoppingCriteria):
-    def __init__(self, tokenizer, expected_rows, row_token="["):
-        self.tokenizer = tokenizer
-        self.expected_rows = expected_rows
-        self.row_token_id = tokenizer.encode(row_token, add_special_tokens=False)[0]
-        self.row_count = 0
-
-    def __call__(self, input_ids, scores, **kwargs):
-        self.row_count = list(input_ids[0].cpu().numpy()).count(self.row_token_id)
-        return self.row_count >= self.expected_rows
-
+from src.utils import infer_out_shape, get_grid_shape
 
 class ARCModel:
     """
@@ -287,9 +272,9 @@ class ARCModel:
             expected_num_rows=expected_shape[0],
             target_platform=self.target_platform
         )
-
+        max_expected = max(expected_shape)
         start_time = time.time()
-        if expected_shape[0] > Config.MAX_N_ROWS:
+        if max_expected > Config.MAX_N:
             out_grid = self.copy_input_solver(task["test"][0]["input"], expected_shape)
         else:
             response = self.get_response(
@@ -302,7 +287,7 @@ class ARCModel:
             if len(out_grid)==0:
                 out_grid = task["test"][0]["input"]
 
-            out_grid_shape = get_grid_shape(out_grid)
+        out_grid_shape = get_grid_shape(out_grid)
             
         elapsed = time.time() - start_time
         if verbose:

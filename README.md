@@ -3,12 +3,13 @@ This repo summarizes the experients as part of the [Zindi ARC Africa challenge](
 
 The competition can serve as a cool starting point for anyone willing to explore the [ARC-AGI](https://arcprize.org/) challenges. 
 
-PS: For the purpose of the Zindi competition, I'm interested in how far can low-cost (often extremely custom) approaches can lead in terms of accuracy. My initial hypothesis, based on the design of the competition is that `a better understanding of the dataset gives enough insights for building a basic solver that can score up to 50% on the public leaderboread`...and hope to be able to demonstrate it, through an iterative process. As such, I will not be exploring any approaches other than few-shot prompting. 
-
 Goal: to be ranked among the top 10 participants at the end of the competition.
 
 ![An example visualization for a task from the training dataset](imgs/train_0413.png
  "Optional Title")
+
+ ## Usage
+ Reproducing the competiton score can be done by using the fallback solver through the `zindi-arc-solver` notebook from top to bottom. Thz below description is also sumarized into the `solution.pdf` document
 
 ## Day 1-2: EDA and problem analysis
 - Exploratory data analysis (EDA)
@@ -65,12 +66,12 @@ train_xxx:
 B. Baseline identification and initial experiments
 - The solution to a puzzle may have a grid of a size similar, bigger, or smaller than that ot the test input.
 - The most common background in the training and test sets seems to be #7 (orange). This can motivate the use of that value as the default fill value instead of #0 (black).
-    - With zeros: `0.310%` (Pub. LB)
-    - With sevens: about `11.72 (Pub. LB)` => using `zeros as background pixels is counterproductive` for this challenge, especially given the evaluation strategy. Thus, a basic and lazy intuition while building the solver is to fall back to orange background pixels if the underlying rule(s) cannot be inferred from the training examples.
+    - With Os: `0.310%` (Pub. LB)
+    - With 7s: about `11.72 (Pub. LB)` => using `zeros as background pixels hurts accuracy on the competition test set` for this challenge, especially given the evaluation strategy. Thus, a basic and lazy intuition while building the solver is to fall back to orange background pixels if the underlying rule(s) cannot be inferred from the training examples.
 - This hackathon is `much much easier`(perhaps intentionally) as we also know a few things about the test data, which makes is pretty much #hackable in the sense that the expected predictions are bounded:
     -  We know the expected number of rows, so the major task on the grid aspect is to determine the expected number of columns. In fact, this might be a design choice for the use of a specific evaluation metric. `Ignoring this might result in several mismatch issues!!` Plus this helps the participants in setting a more realistic baseline to check whether or not the implemented models are doing better than a lazy solver (background predictor which scores about `4.65%` on the Pub. LB).
 
-Best score: 11.72% (Pub. LB, #10)
+Best score: 11.72% (Pub. LB)
 
 ## Day 2: Baseline Experiments (focus)
 - Implemented heuristics for grid/column inference: `infer_out_shape`
@@ -85,7 +86,7 @@ Best score: 11.72% (Pub. LB, #10)
 - Defined setup for LLM integration (next step!)
    - Base prompt definition 
  
-Best score: 31.33% (Pub. LB, #3)
+Best score: 31.33% (Pub. LB)
 
 ## Day 3-4: LLM Integration (focus)
 Research questions: 
@@ -94,25 +95,45 @@ Research questions:
 
 ### Base models:
 
-Mistral-Nemo-Instruct-2407-4bit & Mistral-Nemo-Instruct-2407-4bit
+`Mistral-Nemo-Instruct-2407-4bit` & `Mistral-Nemo-Instruct-2407-4bit`
 - Pretty solid performance and easily integrated
 - No reasoning but fairly good analysis and easy prmpt-follower
 - 4-bit version struggles with large input shapes (greater than 20x20) frem experiments but relatively fast
 - 8-bit version is a bit slow 
 
-Phi-4-mini-reasoning-8bit
+`Phi-4-mini-reasoning-8bit`
 - Thinking model; In-depth analysis of the problem
-- Too much thinking, even when explicitly asked not to.
+- Too verbose (too much thinking), even when explicitly asked not to.
 
-Qwen/Qwen2.5-14B-Instruct
-- ~15GB on MBP (8-bit); ~29GB on RTX 6000
-- Very fast (CUDA) and consistent with the solving the puzzles
-- cannot solve larger inputs (crashes for grid size >20x20)
+`Qwen/Qwen2.5-14B-Instruct`
+- ~15GB on Mac (8-bit); ~29GB (~22GB using 8-bit) on RTX 6000
+    - Quantizing to 8-bit allows for keeping the model within the 24GB limit, making it possible to run it e.g. on an RTX 4090 
+    ```python
+    from transformers import BitsAndBytesConfig
+
+    quantization_config = BitsAndBytesConfig(
+        load_in_8bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype="float16",
+        bnb_4bit_use_double_quant=True
+    )
+
+    llm = AutoModelForCausalLM.from_pretrained(
+        base_llm_name, 
+        torch_dtype=Config.dtype,
+        low_cpu_mem_usage=True,
+        device_map="auto" if torch.cuda.is_available() else None,
+        trust_remote_code   = Config.trust_remote_code,
+        quantization_config=quantization_config
+    )
+    ```
+- Very fast (CUDA) and consistent with the solving process
+- Cannot solve larger inputs on M4 by default (crashes for grid size larger than 15x15)
+- Running on the test set takes ~2hrs
 - Pub. LB: 28.846% with baseline setup (pre-sealing)
     - While preparing my code for review, I noticed a mistake in the grid extraction logic `src/model.py - extract_out_grid` that seems to have affected the model's prediction workflow by replacing most of the predicted values with the `DEFAULT_BG_VALUE`.
 
-
-## TODO
+## TODO LIST
 - Try Qwen2.5 with better prompting and an addtion of tool use (specific functions for grid inference)
     - Also after bug fixes
 - Clean up code base to remove competition-specific conditioning after reviews
@@ -120,7 +141,9 @@ Qwen/Qwen2.5-14B-Instruct
 - Explore multimodal LLM and computer vision approaches 
 
 ## Acknowledgement
-This codebase was developed with the collaboration of GPT-4o for:
-- Brainstorming
-- Code completion
-- Code Refactoring
+This project was developed in close collaboration with GPT-4o as a coding assistant. 
+Its contributions included brainstorming experimental directions, assisting with iterative code completion and refactoring, and supporting the development of grid evaluation routines, prompt engineering, and strategy testing. 
+The interactive workflow allowed for rapid prototyping and refinement, significantly accelerating the pace of experimentation, given the short-term setting.
+
+I would like to express my gratitude to the organizers for setting up this challenge, which not only provided a stimulating and well-structured benchmark, but also rekindled my engagement with the Zindi platform after a long break. 
+The competition offered a refreshing opportunity to explore abstract reasoning tasks in a focused, time-constrained setting.

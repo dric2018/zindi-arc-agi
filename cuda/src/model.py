@@ -1,30 +1,23 @@
 import ast
 
-from collections import Counter
-
-import gc 
-
-from huggingface_hub import login
-
 from src.__init__ import logger
 from src.config import Config
+
 try:
     from mlx_lm import load, generate
 except ImportError:
     pass
 import numpy as np
 
-from pprint import pprint
 import re
 
 import time
 import torch
-import torch.nn as nn
 
-from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig, BitsAndBytesConfig, PreTrainedTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig, BitsAndBytesConfig, PreTrainedTokenizer, StoppingCriteria
 from typing import Tuple
 
-from src.utils import infer_out_shape, get_grid_shape, text_to_grid, fill_irregular_grid
+from src.utils import infer_out_shape, get_grid_shape
 
 class ARCModel:
     """
@@ -38,7 +31,7 @@ class ARCModel:
             system_prompt_path="base_prompt.txt", 
             base_llm_name:str=Config.base_llm,
             verbose:bool=True,
-            target_platform:str=Config.target_platform
+            target_platform:str="mlx"
         ):
         self.model_name         = model_name
         self.verbose            = verbose
@@ -57,21 +50,18 @@ class ARCModel:
                 base_llm_name=self.base_llm_name
             )
 
-            self.llm = self.llm.eval()
 
     def load_llm(
             self,
-            target_platform:str=Config.target_platform,
-            base_llm_name:str = Config.base_llm
+            target_platform:str="mlx",
+            base_llm_name:str = Config.base_llm,
+            quantize_model:bool=Config.quantize_model
         )->Tuple:
 
         if self.verbose:
             logger.info(f"{target_platform=}")
             logger.info(f"{base_llm_name=}")
-        
-        if Config.HF_TOKEN:
-            login(Config.HF_TOKEN)
-            
+
         if target_platform =="mlx":
             self.llm, self.tokenizer = load(
                 base_llm_name,
@@ -87,27 +77,43 @@ class ARCModel:
             assert is_model_chat_ready==True, "Model tokenizer is missing attr apply_chat_template"
         else:
             self.tokenizer  = AutoTokenizer.from_pretrained(base_llm_name)
-            self.llm      = AutoModelForCausalLM.from_pretrained(
-                base_llm_name, 
-                torch_dtype=Config.dtype,
-                low_cpu_mem_usage=True,
-                device_map="auto" if torch.cuda.is_available() else None,
-                trust_remote_code   = Config.trust_remote_code,
-            )
 
-        logger.info(f"✅ Successfully loaded base LLM ({self.base_llm_name}).")
+            if quantize_model:
+                logger.info(f"Loading model in 8-bit.")
+
+                quantization_config = BitsAndBytesConfig(
+                        load_in_8bit=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_compute_dtype="float16",
+                        bnb_4bit_use_double_quant=True
+                )
+                self.llm      = AutoModelForCausalLM.from_pretrained(
+                    base_llm_name, 
+                    torch_dtype=Config.dtype,
+                    low_cpu_mem_usage=True,
+                    device_map="auto" if torch.cuda.is_available() else None,
+                    trust_remote_code   = Config.trust_remote_code,
+                    quantization_config=quantization_config
+                )
+                
+            else:
+                self.llm      = AutoModelForCausalLM.from_pretrained(
+                    base_llm_name, 
+                    torch_dtype=Config.dtype,
+                    low_cpu_mem_usage=True,
+                    device_map="auto" if torch.cuda.is_available() else None,
+                    trust_remote_code   = Config.trust_remote_code
+                ).to(Config.device)
+
+        logger.info(f"Successfully loaded base LLM ({self.base_llm_name}).")
 
     def prepare_model_inputs(
             self,
             prompt:str, 
             expected_num_rows:int,
             task_data=None,
-            target_platform:str=Config.target_platform,
-            verbose:bool=True
+            target_platform:str="mlx"
         ):
-
-        if verbose==True:
-            logger.info("Preparing inputs")
 
         if task_data is not None:
             train_pairs = task_data["train"]
@@ -119,28 +125,29 @@ class ARCModel:
                     expected_rows=expected_num_rows,
                     verbose=False
                 )
-            
-            prompt += "Please only return the most likely test output grid in the same format as the input and based on your understanding of the example puzzles.\n\n"
-            prompt += "Make shure to use the most common value in the test input if you find it difficult to infer it from your analysis\n"
-            prompt += "Do not provide explanations after generating the output.\n\n"
-            prompt += f"No need to think too much but carefully analyze the examples. Here are the training examples: {train_pairs}\n\n"
-            prompt += f"And here is the problem for you to solve. Keep the output shape as {expected_out_shape}: {test["input"]}\n"
-   
+
+            prompt += f"Think but not too long. Here are the training examples: {train_pairs}\n"
+            prompt += f"Return an output with exactly {expected_out_shape[0]} rows.\n"
+            prompt += "Please, do not re-iterate the test input in your answer since it is unnessecary.\n"
+            prompt += "Just apply the rules and return the most likely test output grid in the same format as the input.\n"
+            prompt += "Also, providing too many explanations is optional.\n"
+            prompt += f"Here is the problem for you to solve: {test["input"]}\n\n"
 
 
         messages = [
-            {"role": "system","content": self.base_prompt},
-            {"role": "user", "content": prompt}
+        {
+            "role": "user", 
+            "content": prompt
+            }
         ]
-        if target_platform=="mlx":
-            inputs = self.tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True,
-                return_tensors="pt"
-            )
         
-        else:
+        inputs = self.tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+            return_tensors="pt"
+        )
+        if target_platform!="mlx":
             inputs = self.tokenizer.apply_chat_template(
                 messages,
                 tokenize=True,
@@ -149,9 +156,6 @@ class ARCModel:
                 return_dict=True
             )
             inputs = {k: v.to(Config.device) for k, v in inputs.items() if k!="token_type_ids"}
-        
-        if verbose==True:
-            logger.info("Done!")
 
         return inputs
 
@@ -199,30 +203,54 @@ class ARCModel:
         
         return response
 
-    def solve(self, task, expected_rows:int=None):
+    def solve(
+            self, 
+            task, 
+            task_id:str,
+            expected_rows:int=None,
+            verbose:bool=False
+        ):
         train = task["train"]
-        test = task["test"]
-        results = []
+        test = task["test"][0]
 
-        for test_input in test:
-            if "output" in test_input.keys():
-                # adjust expected row num
-                expected_rows = len(test_input["output"])
+        if "output" in test.keys():
+            # adjust expected row num
+            expected_rows = len(test["output"])
 
-            inferred_out_shape = infer_out_shape(
-                train_pairs=train, 
-                test_input=test_input["input"],  
-                expected_rows=expected_rows,
-                verbose=self.verbose
+        inferred_out_shape = infer_out_shape(
+            train_pairs=train, 
+            test_input=test["input"],  
+            expected_rows=expected_rows,
+            verbose=verbose
+        )
+
+        if self.base_llm_name is not None:
+            if verbose:
+                logger.info("Solving with LLM...")
+            try:
+                out_grid = self.solve_with_llm(
+                    task=task, 
+                    task_id=task_id,
+                    expected_shape=inferred_out_shape,
+                    verbose=verbose
+                )
+            except Exception as e:
+                logger.error(f"Failed LLM execution: {e}")
+        else:
+            out_grid = self.copy_input_solver(
+                test["input"], 
+                inferred_out_shape,
+                verbose=verbose
             )
+                
+        return out_grid
 
-            if self.verbose:
-                logger.info("Fallback solver...")
-            results.append(self.fallback_grid(test_input["input"], inferred_out_shape))
-            
-        return results[0] # this will ensure we only return one prediction
-
-    def copy_input_solver(self, test_input, expected_shape=None, verbose:bool=False):
+    def copy_input_solver(
+            self, 
+            test_input, 
+            expected_shape=None,
+            verbose:bool=False
+            ):
         """
         Returns the input grid as the output grid, optionally adjusting to expected shape.
         
@@ -234,87 +262,86 @@ class ARCModel:
             List[List[int]]: Output grid.
         """
         if verbose:
-            logger.info("Copy input solver...")  
+            logger.info("Fallback - Copy input solver...")  
 
         output = [row[:] for row in test_input]
 
         if expected_shape:
-            output = self.adjust_rows_and_columns(grid=output, expected_shape=expected_shape)
+            output = self.adjust_rows_and_columns(
+                grid=output, 
+                expected_shape=expected_shape,
+                verbose=verbose
+            )
             
-        if self.verbose:
+        if verbose:
             logger.info("Done!")  
 
         return output
 
     def solve_with_llm(
-        self, 
-        task,
-        task_id:str,
-        expected_rows:int=None,
-        verbose:bool=False
-    ):
-        
-        train = task["train"]
-        test = task["test"][0]
-    
-        expected_shape = infer_out_shape(
-            train_pairs=train, 
-            test_input=test["input"],  
-            expected_rows=expected_rows,
-            verbose=False
-        )
-        
+            self, 
+            task, 
+            expected_shape,
+            task_id:str=None,
+            verbose:bool=False
+        ):
+
+        test_input = task["test"][0]["input"]
+        test_in_shape = get_grid_shape(test_input)
+
         if verbose:
-            logger.info(f"Expected shape: {expected_shape}")
+            logger.info(f"In. shape: \t\t{test_in_shape}")
+            logger.info(f"Expected Out. shape: \t{expected_shape}")
         
-        try:
-            inputs = self.prepare_model_inputs(
-                prompt=self.base_prompt,
-                task_data=task,
-                expected_num_rows=expected_shape[0] if expected_shape else None,
-                target_platform=self.target_platform,
-                verbose=False
+        inputs = self.prepare_model_inputs(
+            prompt=self.base_prompt,
+            task_data=task,
+            expected_num_rows=expected_shape[0],
+            target_platform=self.target_platform
+        )
+        max_expected = max(expected_shape)
+        start_time = time.time()
+        if max_expected > Config.MAX_N:
+            out_grid = self.copy_input_solver(test_input, expected_shape)
+        else:
+            response = self.get_response(
+                inputs, 
+                verbose=verbose
             )
-    
-            start_time = time.time()
+            out_grid = self.extract_out_grid(response)
             
-            if expected_shape[0] > Config.MAX_N_ROWS:
-                out_grid = self.copy_input_solver(task["test"][0]["input"], expected_shape, verbose=verbose)
-            else:
-                response = self.get_response(inputs, verbose=verbose)
-                extracted_grids = re.findall(r"\[\s*\[.*?\]\s*\]", response, re.DOTALL)
-                
-                if len(extracted_grids)==0:
-                    out_grid = task["test"][0]["input"]
-                else:
-                    out_grid = extracted_grids[-1]
+            if len(out_grid)==0:
+                out_grid = task["test"][0]["input"]
 
-                out_grid = text_to_grid(out_grid)
+        out_grid_shape = get_grid_shape(out_grid)
             
-            elapsed = time.time() - start_time
-            
+        elapsed = time.time() - start_time
+        
+        if task_id:
             logger.info(f"Task #{task_id} \t Completion time: {elapsed:.4f} seconds")
+        
+        if expected_shape and out_grid_shape!=expected_shape:
+            out_grid = self.adjust_rows_and_columns(
+                grid=out_grid, 
+                expected_shape=expected_shape
+            )
+            
+        return out_grid
 
-            out_grid = self.adjust_rows_and_columns(grid=out_grid, expected_shape=expected_shape)
+    def extract_out_grid(self, response):
+        # Find all list-of-lists patterns (non-greedy, multiline)
+        matches = re.findall(r"\[\s*\[.*?\]\s*\]", response, re.DOTALL)
+        output_grid = []
+        
+        if matches:
+            try:
+                output_grid = ast.literal_eval(matches[-1])
+            except Exception as e:
+                logger.error(e)
+                raise e
+            
+        return output_grid
     
-            torch.cuda.empty_cache()
-            gc.collect()
-            
-            
-        except Exception as e:
-            response = None
-            out_grid = self.copy_input_solver(task["test"][0]["input"], expected_shape, verbose=verbose)
-            out_grid = self.adjust_rows_and_columns(grid=out_grid, expected_shape=expected_shape)
-            
-            logger.error(task_id)
-            logger.error(e)
-
-        return response, out_grid
-            
-
-    def fallback_grid(self, test_input, expected_shape):
-        return self.copy_input_solver(test_input, expected_shape)
-
     def pixel_accuracy(self, pred, target):
         try:
             pred_arr = np.array(pred)
@@ -355,49 +382,42 @@ class ARCModel:
             "mean_pixel_accuracy": sum(pixel_scores) / total
         }
 
-
     def adjust_rows_and_columns(
             self, 
             grid, 
-            expected_shape
+            expected_shape, 
+            fill_value=Config.DEFAULT_BG_VALUE,
+            verbose:bool=False
         ):
         """
         Adjusts a grid to the expected (rows, cols) shape by cropping or padding.
-    
+        
         Args:
             grid (List[List[int]]): The grid to adjust.
             expected_shape (tuple): (rows, cols)
-    
+            fill_value (int): Value to pad with, default is 7 (orange).
+            
         Returns:
             List[List[int]]: Resized grid.
         """
-    
-        flat = [cell for row in grid for cell in row]
-        fill_value = Counter(flat).most_common(1)[0][0] if flat else Config.DEFAULT_BG_VALUE
+        if verbose:
+            logger.info("Adjusting grid...")  
+            logger.info(f"{expected_shape=}")
 
-        if self.verbose:
-            logger.info("Adjusting grid...")
-            logger.info(f"{expected_shape=}, {fill_value=}")
-    
         exp_rows, exp_cols = expected_shape
         adjusted = []
-    
+
         for i in range(exp_rows):
             if i < len(grid):
-                row = grid[i][:exp_cols]
+                row = grid[i][:exp_cols]  # crop if needed
                 if len(row) < exp_cols:
-                    row += [fill_value] * (exp_cols - len(row))
+                    row += [fill_value] * (exp_cols - len(row)) 
             else:
-                row = [fill_value] * exp_cols
+                row = [fill_value] * exp_cols # pad grid
             adjusted.append(row)
-    
-        if self.verbose:
+       
+        if verbose:
             final_shape = get_grid_shape(adjusted)
             logger.info(f"{final_shape=}")
-    
+        
         return adjusted
-
-
-
-
-
