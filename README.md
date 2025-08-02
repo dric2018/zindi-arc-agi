@@ -9,9 +9,11 @@ Goal: to be ranked among the top 10 participants at the end of the competition.
  "Optional Title")
 
  ## Usage
- Reproducing the competiton score can be done by using the fallback solver through the `zindi-arc-solver` notebook from top to bottom. Thz below description is also sumarized into the `solution.pdf` document
+ Reproducing the competiton score can be done by using the fallback solver through the `zindi-arc-solver` notebook from top to bottom. The below description is also sumarized into the `solution.pdf` document
 
 ## Day 1-2: EDA and problem analysis
+The EDA stage can be replecated by running the `data-exploration` notebook.
+
 - Exploratory data analysis (EDA)
    - Local dev setup (MBP M4 - 24GB, NVIDIA RTX 6000 - 48GB)
    - Data visualization toolkit built around the code base from [Oleg X@Kaggle](https://www.kaggle.com/code/allegich/arc-agi-2025-starter-notebook-eda/notebook)
@@ -106,13 +108,14 @@ Research questions:
 - Too verbose (too much thinking), even when explicitly asked not to.
 
 `Qwen/Qwen2.5-14B-Instruct`
-- ~15GB on Mac (8-bit); ~29GB (~22GB using 8-bit) on RTX 6000
+- ~15GB on Mac (8-bit); ~29GB (~22GB using 8-bit and ~16GB using 4-bit) on RTX 6000
     - Quantizing to 8-bit allows for keeping the model within the 24GB limit, making it possible to run it e.g. on an RTX 4090 
     ```python
     from transformers import BitsAndBytesConfig
 
     quantization_config = BitsAndBytesConfig(
-        load_in_8bit=True,
+        load_in_4bit=True, # requires about 16GB of VRAM
+        load_in_8bit=False, # requires about 24-29GB of VRAM
         bnb_4bit_quant_type="nf4",
         bnb_4bit_compute_dtype="float16",
         bnb_4bit_use_double_quant=True
@@ -129,9 +132,11 @@ Research questions:
     ```
 - Very fast (CUDA) and consistent with the solving process
 - Cannot solve larger inputs on M4 by default (crashes for grid size larger than 15x15)
-- Running on the test set takes ~2hrs
+- Running on the full test set takes ~2hrs in 8-bit precision, each output being generated in a maximum of `3-5min`
+- No extra prompting or sophisticated tuning
 - Pub. LB: 28.846% with baseline setup (pre-sealing)
     - While preparing my code for review, I noticed a mistake in the grid extraction logic `src/model.py - extract_out_grid` that seems to have affected the model's prediction workflow by replacing most of the predicted values with the `DEFAULT_BG_VALUE`.
+    - Fixing this bug resulted in a `Pub. LB score of 32.382%` (Priv. LB: 31.958%)
 
 ## TODO LIST
 - Try Qwen2.5 with better prompting and an addtion of tool use (specific functions for grid inference)
