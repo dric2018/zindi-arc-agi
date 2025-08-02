@@ -9,7 +9,7 @@ Goal: to be ranked among the top 10 participants at the end of the competition.
  "Optional Title")
 
  ## Usage
- Reproducing the competiton score can be done by using the fallback solver through the `zindi-arc-solver` notebook from top to bottom. The below description is also sumarized into the `solution.pdf` document
+ Reproducing the competiton score can be done by using the fallback solver through the `zindi-arc-solver` notebook from top to bottom. The below description is also sumarized into the `solution.pdf` document.
 
 ## Day 1-2: EDA and problem analysis
 The EDA stage can be replecated by running the `data-exploration` notebook.

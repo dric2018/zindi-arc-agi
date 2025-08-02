@@ -2,9 +2,10 @@ data/
 old_data/
 submissions/
 writeup/
-mlx/
-cuda/
-
+!cuda/
+!cuda/**
+!mlx/
+!mlx/**
 # src
 src/__pycache__/
 src/.ipynb_checkpoints/
