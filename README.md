@@ -9,10 +9,30 @@ Goal: to be ranked among the top 10 participants at the end of the competition.
  "Optional Title")
 
  ## Usage
- Reproducing the competiton score can be done by using the fallback solver through the `zindi-arc-solver` notebook from top to bottom. The below description is also sumarized into the `solution.pdf` document.
+ Reproducing the competiton score can be done by using the fallback solver through the [zindi-arc-solver.ipynb](/zindi-arc-solver.ipynb) notebook from top to bottom. The below description is also sumarized into the `solution.pdf` document.
+
+ Note: If running the submission notebook on Google colab, unsure to use the following steps:
+ - upload the [zindi-arc-solver-colab.ipynb](/zindi-arc-solver-colab.ipynb) to colab; no GPU is required
+ - After running the cell containing the command `!mkdir submissions src data`, upload the data and src files to their respected folder
+    - data
+        - train.json
+        - test.json
+        - SampleSubmission.csv
+    - src
+        - `__init__.py`
+        - model.py
+        - utils.py
+        - config.py
+        - base_prompt.txt
+  - update the `config.py` file y replacing the root folder 
+ ```python 
+ root="/content/"
+ ```
+ - Then run the subsequent cells to generate the submission file
+
 
 ## Day 1-2: EDA and problem analysis
-The EDA stage can be replecated by running the `data-exploration` notebook.
+The EDA stage can be replecated by running the [data-exploration.ipynb](/data-exploration.ipynb) notebook.
 
 - Exploratory data analysis (EDA)
    - Local dev setup (MBP M4 - 24GB, NVIDIA RTX 6000 - 48GB)
@@ -137,6 +157,7 @@ Research questions:
 - Pub. LB: 28.846% with baseline setup (pre-sealing)
     - While preparing my code for review, I noticed a mistake in the grid extraction logic `src/model.py - extract_out_grid` that seems to have affected the model's prediction workflow by replacing most of the predicted values with the `DEFAULT_BG_VALUE`.
     - Fixing this bug resulted in a `Pub. LB score of 32.382%` (Priv. LB: 31.958%)
+    - You can run this experiment with the [cuda-llm-solver.ipynb](/cuda-llm-solver.ipynb) notebook
 
 ## TODO LIST
 - Try Qwen2.5 with better prompting and an addtion of tool use (specific functions for grid inference)

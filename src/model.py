@@ -213,7 +213,7 @@ class ARCModel:
     def solve(
             self, 
             task, 
-            task_id:str,
+            task_id:str=None,
             expected_rows:int=None,
             verbose:bool=False
         ):

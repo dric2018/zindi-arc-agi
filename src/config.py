@@ -35,7 +35,7 @@ class Config:
     do_sample           = True
     trust_remote_code   = True
     quantize_model      = True
-    MAX_N               = 30
+    MAX_N          = 30
 
 
     
