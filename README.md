@@ -91,7 +91,8 @@ B. Baseline identification and initial experiments
     - With Os: `0.310%` (Pub. LB)
     - With 7s: about `11.72 (Pub. LB)` => using `zeros as background pixels hurts accuracy on the competition test set` for this challenge, especially given the evaluation strategy. Thus, a basic and lazy intuition while building the solver is to fall back to orange background pixels if the underlying rule(s) cannot be inferred from the training examples.
 - This hackathon is `much much easier` that the original ARC-AGI challenge (perhaps intentionally) as we also know a few things about the test data, which makes is pretty much #hackable in the sense that the expected predictions are bounded:
-    -  We know the expected number of rows, so the major task on the grid aspect is to determine the expected number of columns. In fact, this might be a design choice for the use of a specific evaluation metric. `Ignoring this might result in several mismatch issues!!` - - This may help participants in setting a more realistic baseline to check whether or not the implemented models are doing better than a lazy solver (e.g. background predictor which scores about `4.65%` on the Pub. LB).
+    -  We know the expected number of rows, so the major task on the grid aspect is to determine the expected number of columns. In fact, this might be a design choice for the use of a specific evaluation metric. `Ignoring this might result in several mismatch issues!!` - 
+    - This may help participants in setting a more realistic baseline to check whether or not the implemented models are doing better than a lazy solver (e.g. background predictor which scores about `4.65%` on the Pub. LB).
     - We also know the expected number of columns, but I intentionally ignored this detail while designing the solution
 
 Best score: 11.72% (Pub. LB)
