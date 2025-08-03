@@ -136,7 +136,7 @@ Research questions:
 
     quantization_config = BitsAndBytesConfig(
         load_in_4bit=True, # requires less than 16GB of VRAM
-        load_in_8bit=False, # if trye, requires less than 24GB of VRAM
+        load_in_8bit=False, # if true, requires less than 24GB of VRAM
         bnb_4bit_quant_type="nf4",
         bnb_4bit_compute_dtype="float16",
         bnb_4bit_use_double_quant=True
