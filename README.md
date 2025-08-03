@@ -163,8 +163,7 @@ Research questions:
 
 ## TODO LIST
 - Try Qwen2.5 with better prompting and an addtion of tool use (specific functions for grid inference)
-    - Also after bug fixes
-    - Optimize pipeline for faster inference
+    - Also after bug fixes, optimize pipeline for faster inference
 - Clean up code base to remove competition-specific conditioning after reviews
     - to facilitate exploration of the official challenge
 - Explore multimodal LLM and computer vision approaches 
