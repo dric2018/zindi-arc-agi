@@ -1,7 +1,7 @@
 # Zindi ARC challenge: A 5-day Sprint
 This repo summarizes the experients as part of the [Zindi ARC Africa challenge](https://zindi.africa/competitions/the-arc-challenge-africa).
 
-The competition can serve as a cool starting point for anyone willing to explore the [ARC-AGI](https://arcprize.org/) challenges. 
+This competition can serve as a starting point for anyone willing to explore the [ARC-AGI](https://arcprize.org/) challenges. 
 
 Goal: to be ranked among the top 10 participants at the end of the competition.
 
@@ -11,22 +11,22 @@ Goal: to be ranked among the top 10 participants at the end of the competition.
  ## Usage
  Reproducing the competiton score can be done by using the fallback solver through the [zindi-arc-solver.ipynb](/zindi-arc-solver.ipynb) notebook from top to bottom. The below description is also sumarized in the `solution.pdf` document. The solution was only tested on Unix-based host machines.
 
- Note: If running the submission notebook on Google colab, unsure to use the following steps:
+ Note: If running the submission notebook on Google colab, make sure to use the following steps:
  - upload the `zindi-arc-solver-colab.ipynb` to colab; no GPU is required
  - After running the cell containing the command `!mkdir submissions src data`, upload the data and src files to their respected folder
-    - data
+    - data/
         - train.json
         - test.json
         - SampleSubmission.csv
-    - src
+    - src/
         - `__init__.py`
         - model.py
         - utils.py
         - config.py
         - base_prompt.txt
-  - update the `config.py` file y replacing the root folder 
+  - update the `config.py` file by replacing the root folder (if necessary)
  ```python 
- root="/content/"
+ root="/content/" # or keep it as "./"
  ```
  - Then run the subsequent cells to generate the submission file
 
@@ -90,8 +90,9 @@ B. Baseline identification and initial experiments
 - The most common background in the training and test sets seems to be #7 (orange). This can motivate the use of that value as the default fill value instead of #0 (black).
     - With Os: `0.310%` (Pub. LB)
     - With 7s: about `11.72 (Pub. LB)` => using `zeros as background pixels hurts accuracy on the competition test set` for this challenge, especially given the evaluation strategy. Thus, a basic and lazy intuition while building the solver is to fall back to orange background pixels if the underlying rule(s) cannot be inferred from the training examples.
-- This hackathon is `much much easier`(perhaps intentionally) as we also know a few things about the test data, which makes is pretty much #hackable in the sense that the expected predictions are bounded:
-    -  We know the expected number of rows, so the major task on the grid aspect is to determine the expected number of columns. In fact, this might be a design choice for the use of a specific evaluation metric. `Ignoring this might result in several mismatch issues!!` Plus this helps the participants in setting a more realistic baseline to check whether or not the implemented models are doing better than a lazy solver (background predictor which scores about `4.65%` on the Pub. LB).
+- This hackathon is `much much easier` that the original ARC-AGI challenge (perhaps intentionally) as we also know a few things about the test data, which makes is pretty much #hackable in the sense that the expected predictions are bounded:
+    -  We know the expected number of rows, so the major task on the grid aspect is to determine the expected number of columns. In fact, this might be a design choice for the use of a specific evaluation metric. `Ignoring this might result in several mismatch issues!!` - - This may help participants in setting a more realistic baseline to check whether or not the implemented models are doing better than a lazy solver (e.g. background predictor which scores about `4.65%` on the Pub. LB).
+    - We also know the expected number of columns, but I intentionally ignored this detail while designing the solution
 
 Best score: 11.72% (Pub. LB)
 
@@ -112,14 +113,14 @@ Best score: 31.33% (Pub. LB)
 
 ## Day 3-4: LLM Integration (focus)
 Research questions: 
-- Does leveraging an LLM improve the score model's performance?
+- Does leveraging an LLM improve the model's performance?
 - Which base LLMs provide better `performance-cost` compromise?
 
 ### Base models:
 
 `Mistral-Nemo-Instruct-2407-4bit` & `Mistral-Nemo-Instruct-2407-4bit`
 - Pretty solid performance and easily integrated
-- No reasoning but fairly good analysis and easy prmpt-follower
+- No reasoning but fairly good analysis and easy prompt-follower
 - 4-bit version struggles with large input shapes (greater than 20x20) frem experiments but relatively fast
 - 8-bit version is a bit slow 
 
@@ -134,8 +135,8 @@ Research questions:
     from transformers import BitsAndBytesConfig
 
     quantization_config = BitsAndBytesConfig(
-        load_in_4bit=True, # requires about 16GB of VRAM
-        load_in_8bit=False, # requires about 24-29GB of VRAM
+        load_in_4bit=True, # requires less than 16GB of VRAM
+        load_in_8bit=False, # if trye, requires less than 24GB of VRAM
         bnb_4bit_quant_type="nf4",
         bnb_4bit_compute_dtype="float16",
         bnb_4bit_use_double_quant=True
@@ -152,19 +153,21 @@ Research questions:
     ```
 - Very fast (CUDA) and consistent with the solving process
 - Cannot solve larger inputs on M4 by default (crashes for grid size larger than 15x15)
-- Running on the full test set takes ~2hrs in 8-bit precision, each output being generated in a maximum of `3-5min`
+- Running on the full test set takes ~2hrs in 4-bit or 8-bit precision, each output being generated in a maximum of `3-5min` in a single pass.
 - No extra prompting or sophisticated tuning
-- Pub. LB: 28.846% with baseline setup (pre-sealing)
+- `Pub. LB: 28.846%` with baseline setup (pre-sealing)
     - While preparing my code for review, I noticed a mistake in the grid extraction logic `src/model.py - extract_out_grid` that seems to have affected the model's prediction workflow by replacing most of the predicted values with the `DEFAULT_BG_VALUE`.
-    - Fixing this bug resulted in a `Pub. LB score of 32.382%` (Priv. LB: 31.958%)
+    - Fixing this bug resulted in a `Pub. LB score of 32.382% (Priv. LB: 31.958%)`, an over`+3`improvement on the originally reported score
     - You can run this experiment with the [cuda-llm-solver.ipynb](/cuda-llm-solver.ipynb) notebook
 
 ## TODO LIST
 - Try Qwen2.5 with better prompting and an addtion of tool use (specific functions for grid inference)
     - Also after bug fixes
+    - Optimize pipeline for faster inference
 - Clean up code base to remove competition-specific conditioning after reviews
     - to facilitate exploration of the official challenge
 - Explore multimodal LLM and computer vision approaches 
+    - Intuition: too hard to textually describe the intermediate steps, as they usually appear obvious from a visual perspective.
 
 ## Acknowledgement
 This project was developed in close collaboration with GPT-4o as a coding assistant. 
