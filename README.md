@@ -161,6 +161,8 @@ Research questions:
     - Fixing this bug resulted in a `Pub. LB score of 32.382% (Priv. LB: 31.958%)`, an over`+3`improvement on the originally reported score and a `+1` improvement on the previous best score (cp-solver)
     - You can run this experiment with the [cuda-llm-solver.ipynb](/cuda-llm-solver.ipynb) notebook
 
+(Effective) Best score: 32.382% (Pub. LB); 31.958% (Priv. LB)
+
 ## TODO LIST
 - Try Qwen2.5 with better prompting and an addtion of tool use (specific functions for grid inference)
     - Also after bug fixes, optimize pipeline for faster inference
