@@ -1,3 +1,10 @@
+"""
+# Author Information
+======================
+Author: Cedric Manouan
+Last Update: 2 Aug, 2025
+"""
+
 from src.__init__ import logger
 
 from collections import defaultdict, Counter
@@ -9,7 +16,6 @@ import json
 
 import matplotlib.pyplot as plt
 
-import numpy as np
 
 import os.path as osp
 

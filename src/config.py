@@ -1,6 +1,11 @@
+"""
+# Author Information
+======================
+Author: Cedric Manouan
+Last Update: 2 Aug, 2025
+"""
 from   matplotlib import colors
 
-import os
 import os.path as osp
 
 import torch

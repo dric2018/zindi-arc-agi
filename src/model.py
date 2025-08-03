@@ -1,3 +1,10 @@
+"""
+# Author Information
+======================
+Author: Cedric Manouan
+Last Update: 2 Aug, 2025
+"""
+
 import ast
 
 from src.__init__ import logger
@@ -14,7 +21,7 @@ import re
 import time
 import torch
 
-from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig, BitsAndBytesConfig, PreTrainedTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig, BitsAndBytesConfig
 from typing import Tuple
 
 from src.utils import infer_out_shape, get_grid_shape
