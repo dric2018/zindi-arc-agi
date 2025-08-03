@@ -91,7 +91,7 @@ B. Baseline identification and initial experiments
     - With Os: `0.310%` (Pub. LB)
     - With 7s: about `11.72 (Pub. LB)` => using `zeros as background pixels hurts accuracy on the competition test set` for this challenge, especially given the evaluation strategy. Thus, a basic and lazy intuition while building the solver is to fall back to orange background pixels if the underlying rule(s) cannot be inferred from the training examples.
 - This hackathon is `much much easier` that the original ARC-AGI challenge (perhaps intentionally) as we also know a few things about the test data, which makes is pretty much #hackable in the sense that the expected predictions are bounded:
-    -  We know the expected number of rows, so the major task on the grid aspect is to determine the expected number of columns. In fact, this might be a design choice for the use of a specific evaluation metric. `Ignoring this might result in several mismatch issues!!` - 
+    -  We know the expected number of rows, so the major task on the grid aspect is to determine the expected number of columns. In fact, this might be a design choice for the use of a specific evaluation metric. `Ignoring this might result in several mismatch issues!!`
     - This may help participants in setting a more realistic baseline to check whether or not the implemented models are doing better than a lazy solver (e.g. background predictor which scores about `4.65%` on the Pub. LB).
     - We also know the expected number of columns, but I intentionally ignored this detail while designing the solution
 
@@ -158,7 +158,7 @@ Research questions:
 - No extra prompting or sophisticated tuning
 - `Pub. LB: 28.846%` with baseline setup (pre-sealing)
     - While preparing my code for review, I noticed a mistake in the grid extraction logic `src/model.py - extract_out_grid` that seems to have affected the model's prediction workflow by replacing most of the predicted values with the `DEFAULT_BG_VALUE`.
-    - Fixing this bug resulted in a `Pub. LB score of 32.382% (Priv. LB: 31.958%)`, an over`+3`improvement on the originally reported score
+    - Fixing this bug resulted in a `Pub. LB score of 32.382% (Priv. LB: 31.958%)`, an over`+3`improvement on the originally reported score and a `+1` improvement on the previous best score (cp-solver)
     - You can run this experiment with the [cuda-llm-solver.ipynb](/cuda-llm-solver.ipynb) notebook
 
 ## TODO LIST
